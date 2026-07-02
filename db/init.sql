@@ -67,6 +67,10 @@ CREATE ROLE core_api_svc WITH LOGIN PASSWORD 'changeme_core_api_local';
 GRANT SELECT, INSERT, UPDATE ON users, policies, claims TO core_api_svc;
 GRANT SELECT ON documents TO core_api_svc;
 GRANT INSERT ON audit_log TO core_api_svc;
+-- Both services INSERT into audit_log, so both need sequence access
+-- to generate the auto-incrementing id via nextval()
+GRANT USAGE, SELECT ON SEQUENCE audit_log_id_seq TO core_api_svc;
+GRANT USAGE, SELECT ON SEQUENCE audit_log_id_seq TO document_svc;
 -- Explicitly no DELETE anywhere, no UPDATE on audit_log, no UPDATE on documents
 
 -- Document service: only touches documents table
