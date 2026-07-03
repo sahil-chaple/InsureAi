@@ -54,3 +54,9 @@ services:
 volumes:
   postgres-data:
   redis-data:
+keycloak:
+  command:
+    - start-dev
+    - --import-realm
+  volumes:
+    - ./db/keycloak/insurance-platform-realm.json:/opt/keycloak/data/import/insurance-platform-realm.json:ro

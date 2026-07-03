@@ -50,3 +50,5 @@ these live only in someone's head or a Slack thread.
 - [ ] Production secrets manager choice
 - [ ] TLS termination strategy for prod
 - [ ] Log redaction policy (make sure PII never lands in plaintext logs)
+
+Keycloak realm config is version-controlled via db/keycloak/insurance-platform-realm.json and auto-imported — don't configure realm/roles/clients only through the UI without re-exporting
