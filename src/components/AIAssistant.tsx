@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Sparkles, X, Send } from "lucide-react";
 import { Button, AIBadge, Spinner } from "./ui-kit";
-import { askAssistant } from "@/services/ai";
+import { getChatResponse } from "@/services/ai";
 
 type Msg = { role: "user" | "ai"; text: string };
 
@@ -19,8 +19,8 @@ export function AIAssistant() {
     setMsgs((m) => [...m, { role: "user", text: q }]);
     setInput("");
     setBusy(true);
-    const reply = await askAssistant(q);
-    setMsgs((m) => [...m, { role: "ai", text: reply }]);
+    const reply = await getChatResponse(q);
+    setMsgs((m) => [...m, { role: "ai", text: reply.text }]);
     setBusy(false);
   }
 

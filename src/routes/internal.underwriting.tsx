@@ -3,10 +3,14 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { Badge, Button, Card, AIPanel, Input, Modal } from "@/components/ui-kit";
 import { mockApplications } from "@/data/mock";
-import { fmtINR } from "@/data/plans";
+import { fmtINR } from "@/lib/format";
 import { toast } from "sonner";
+import { requireAuth } from "@/components/ProtectedRoute";
 
-export const Route = createFileRoute("/internal/underwriting")({ component: UnderwritingPage });
+export const Route = createFileRoute("/internal/underwriting")({
+  component: UnderwritingPage,
+  beforeLoad: requireAuth(["underwriter", "admin"]),
+});
 
 function UnderwritingPage() {
   const [openId, setOpenId] = useState<string | null>(null);

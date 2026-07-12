@@ -1,32 +1,42 @@
-import { plans, type Plan } from "@/data/plans";
+import { mockPolicies, mockRecommendations } from "@/data/mockData";
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-export async function listPlans(): Promise<Plan[]> {
-  await sleep(300);
-  return plans;
+export async function getUserPolicies() {
+  await sleep(800);
+  return mockPolicies;
 }
 
-export async function getPlan(id: string): Promise<Plan | undefined> {
-  await sleep(200);
-  return plans.find((p) => p.id === id);
-}
-
-export async function issuePolicy(planId: string, holder: string) {
+export async function getPolicyById(id: string) {
   await sleep(600);
-  const p = plans.find((pl) => pl.id === planId)!;
-  const now = new Date();
-  const end = new Date(now); end.setFullYear(end.getFullYear() + 1);
+  return mockPolicies.find((p) => p.id === id) || null;
+}
+
+export async function getRecommendations() {
+  await sleep(1200);
+  return mockRecommendations;
+}
+
+export async function getPlanById(id: string) {
+  await sleep(600);
+  return mockRecommendations.find((p) => p.id === id) || null;
+}
+
+export async function issuePolicy(planId: string, holderName: string) {
+  await sleep(1000);
+  const plan = mockRecommendations.find((p) => p.id === planId);
+  const validFrom = new Date().toISOString();
+  const validTo = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString();
   return {
-    id: `INS-${now.getFullYear()}-${p.type.slice(0, 2).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`,
-    planId: p.id,
-    planName: p.name,
-    type: p.type,
-    coverage: p.coverage,
-    premium: p.premium,
+    id: `INS-2024-${plan?.type.slice(0, 2).toUpperCase() || "HL"}-00${Math.floor(100 + Math.random() * 900)}`,
+    planId,
+    planName: plan?.name || "Insurance Plan",
+    type: plan?.type || "General",
+    coverage: plan?.coverage || 500000,
+    premium: plan?.premium || 10000,
     status: "Active" as const,
-    validFrom: now.toISOString(),
-    validTo: end.toISOString(),
-    holder,
+    validFrom,
+    validTo,
+    holder: holderName,
   };
 }
