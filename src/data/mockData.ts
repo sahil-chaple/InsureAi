@@ -135,8 +135,8 @@ export const mockPolicies: MockPolicy[] = [
       "No Claim Bonus: 10% increase in coverage per claim-free year",
     ],
     documents: [
-      { name: "Policy_HL-2024.pdf" },
-      { name: "Premium_Receipt_HL_2024.pdf" },
+      { name: "Policy_HL-2024.pdf", size: "2.4 MB" },
+      { name: "Premium_Receipt_HL_2024.pdf", size: "380 KB" },
     ],
     nominee: {
       name: "Pooja Sharma",
@@ -162,8 +162,8 @@ export const mockPolicies: MockPolicy[] = [
       "Engine Protection: Coverage against hydrostatic lock and leakage",
     ],
     documents: [
-      { name: "Policy_MT-2024.pdf" },
-      { name: "Car_Registration_Copy.pdf" },
+      { name: "Policy_MT-2024.pdf", size: "3.1 MB" },
+      { name: "Car_Registration_Copy.pdf", size: "1.2 MB" },
     ],
     nominee: {
       name: "Pooja Sharma",
@@ -188,8 +188,8 @@ export const mockPolicies: MockPolicy[] = [
       "Accidental Death Benefit Rider: Additional ₹20,00,000 payout",
     ],
     documents: [
-      { name: "Policy_LF-2024.pdf" },
-      { name: "Medical_Report_2014.pdf" },
+      { name: "Policy_LF-2024.pdf", size: "4.5 MB" },
+      { name: "Medical_Report_2014.pdf", size: "2.1 MB" },
     ],
     nominee: {
       name: "Pooja Sharma",
@@ -240,6 +240,7 @@ export const mockRecommendations: RecommendationPlan[] = [
   {
     id: "plan-1",
     name: "Star Comprehensive Health",
+    provider: "Star Health",
     type: "Health",
     coverage: 500000,
     premium: 9800,
@@ -265,6 +266,7 @@ export const mockRecommendations: RecommendationPlan[] = [
   {
     id: "plan-2",
     name: "Care Health Plus",
+    provider: "Care Health",
     type: "Health",
     coverage: 300000,
     premium: 6200,
@@ -284,6 +286,7 @@ export const mockRecommendations: RecommendationPlan[] = [
   {
     id: "plan-3",
     name: "HDFC ERGO Optima Secure",
+    provider: "HDFC ERGO",
     type: "Health",
     coverage: 1000000,
     premium: 18500,
@@ -310,6 +313,7 @@ export const mockRecommendations: RecommendationPlan[] = [
   {
     id: "plan-4",
     name: "Bajaj Allianz Motor OD",
+    provider: "Bajaj Allianz",
     type: "Motor",
     coverage: 800000,
     premium: 12400,

@@ -26,7 +26,7 @@ export async function submitClaim(data: SubmitClaimInput): Promise<MockClaim> {
     type: data.type ?? "General",
     amount: data.amount ?? 0,
     status: "under_review",
-    dateFiled: new Date().toLocaleDateString("en-GB", {
+    filedAt: new Date().toLocaleDateString("en-GB", {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -35,7 +35,7 @@ export async function submitClaim(data: SubmitClaimInput): Promise<MockClaim> {
     aiConfidence: 95,
     summary:
       "Claim submitted via customer portal. Initial AI assessment pending.",
-    policyId: data.policyId,
+    policyId: data.policyId || "",
   };
   return newClaim;
 }
