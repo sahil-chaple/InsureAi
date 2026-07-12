@@ -1,15 +1,17 @@
 import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
-import { Check, Sparkles } from "lucide-react";
-import insureaiLogo from "@/assets/insureai-logo.png.asset.json";
+import { Check, Shield, Sparkles } from "lucide-react";
 
 export function cn(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(" ");
 }
 
-export function Logo({ className = "", size = 32, showText: _showText }: { className?: string; size?: number; showText?: boolean }) {
+export function Logo({ className = "" }: { className?: string; size?: number; showText?: boolean }) {
   return (
-    <span className={cn("inline-flex items-center", className)} aria-label="InsureAI">
-      <img src={insureaiLogo.url} alt="InsureAI — Intelligent Protection" style={{ height: size, width: "auto" }} className="block" />
+    <span className={cn("inline-flex items-center gap-2", className)} aria-label="InsureAI">
+      <Shield size={28} className="text-primary shrink-0" strokeWidth={2.25} />
+      <span className="text-[18px] font-bold tracking-tight">
+        Insure<span className="ai-gradient-text">AI</span>
+      </span>
     </span>
   );
 }

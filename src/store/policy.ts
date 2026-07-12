@@ -1,7 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { RecommendationPlan } from "@/data/mockData";
 
-export type Policy = {
+/** Issued policy from checkout flow */
+export type IssuedPolicy = {
   id: string;
   planId: string;
   planName: string;
@@ -15,31 +17,68 @@ export type Policy = {
 };
 
 type Store = {
+  selectedPlan: RecommendationPlan | null;
   selectedPlanId: string | null;
+  comparedPlanIds: string[];
   compare: string[];
-  policies: Policy[];
+  userPolicies: IssuedPolicy[];
+  policies: IssuedPolicy[];
+  selectPlan: (plan: RecommendationPlan) => void;
   setSelected: (id: string | null) => void;
+  addToCompare: (id: string) => void;
+  removeFromCompare: (id: string) => void;
   toggleCompare: (id: string) => void;
   clearCompare: () => void;
-  addPolicy: (p: Policy) => void;
+  addPolicy: (p: IssuedPolicy) => void;
 };
 
 export const usePolicyStore = create<Store>()(
   persist(
-    (set) => ({
+    (set, get) => ({
+      selectedPlan: null,
       selectedPlanId: null,
+      comparedPlanIds: [],
       compare: [],
+      userPolicies: [],
       policies: [],
+
+      selectPlan: (plan) => set({ selectedPlan: plan, selectedPlanId: plan.id }),
+
       setSelected: (id) => set({ selectedPlanId: id }),
-      toggleCompare: (id) =>
-        set((s) => {
-          if (s.compare.includes(id)) return { compare: s.compare.filter((x) => x !== id) };
-          if (s.compare.length >= 3) return s;
-          return { compare: [...s.compare, id] };
-        }),
-      clearCompare: () => set({ compare: [] }),
-      addPolicy: (p) => set((s) => ({ policies: [p, ...s.policies] })),
+
+      addToCompare: (id) => {
+        const { comparedPlanIds } = get();
+        if (comparedPlanIds.includes(id) || comparedPlanIds.length >= 3) return;
+        const next = [...comparedPlanIds, id];
+        set({ comparedPlanIds: next, compare: next });
+      },
+
+      removeFromCompare: (id) => {
+        const next = get().comparedPlanIds.filter((x) => x !== id);
+        set({ comparedPlanIds: next, compare: next });
+      },
+
+      toggleCompare: (id) => {
+        const { comparedPlanIds } = get();
+        if (comparedPlanIds.includes(id)) {
+          const next = comparedPlanIds.filter((x) => x !== id);
+          set({ comparedPlanIds: next, compare: next });
+        } else if (comparedPlanIds.length < 3) {
+          const next = [...comparedPlanIds, id];
+          set({ comparedPlanIds: next, compare: next });
+        }
+      },
+
+      clearCompare: () => set({ comparedPlanIds: [], compare: [] }),
+
+      addPolicy: (p) =>
+        set((s) => ({
+          userPolicies: [p, ...s.userPolicies],
+          policies: [p, ...s.policies],
+        })),
     }),
     { name: "insureai-policy" },
   ),
 );
+
+export type Policy = IssuedPolicy;

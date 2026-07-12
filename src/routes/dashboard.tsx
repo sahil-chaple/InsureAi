@@ -1,15 +1,10 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { AppLayout } from "@/components/AppLayout";
-import { useAuthStore } from "@/store/auth";
+import { requireAuth } from "@/components/ProtectedRoute";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
-  beforeLoad: () => {
-    if (typeof window !== "undefined") {
-      const s = useAuthStore.getState();
-      if (!s.isAuthenticated) throw redirect({ to: "/login" });
-    }
-  },
+  beforeLoad: requireAuth(["customer"]),
 });
 
 function DashboardLayout() {

@@ -33,8 +33,8 @@ function SignupPage() {
     if (!validate()) return;
     setBusy(true);
     try {
-      const user = await signup(form.name, form.email);
-      login(user);
+      const { user, token } = await signup(form.name, form.email);
+      login(user, token);
       toast.success("Account created — let's build your profile.");
       navigate({ to: "/onboarding" });
     } finally { setBusy(false); }

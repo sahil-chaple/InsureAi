@@ -33,18 +33,20 @@ function LoginPage() {
     if (Object.keys(err).length) return;
     setBusy(true);
     try {
-      const u = await loginSvc(form.email);
-      login(u);
-      toast.success(`Welcome back, ${u.name}`);
-      navigate({ to: "/dashboard" });
-    } finally { setBusy(false); }
+      const { user, token } = await loginSvc(form.email, form.password);
+      login(user, token);
+      toast.success(`Welcome back, ${user.name}`);
+      navigate({ to: roleHome(user.role) });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function onDemo(role: Role) {
     setDemoBusy(role);
     try {
-      const u = await demoLogin(role);
-      login(u);
+      const { user, token } = await demoLogin(role);
+      login(user, token);
       toast.success(`Logged in as ${role.replace("_", " ")}`);
       navigate({ to: roleHome(role) });
     } finally { setDemoBusy(null); }

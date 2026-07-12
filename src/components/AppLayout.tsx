@@ -100,7 +100,7 @@ export function AppLayout({ children, variant }: { children: ReactNode; variant:
           <div className="border-t p-3">
             <div className="mb-3 flex items-center gap-3 rounded-xl bg-muted/50 px-3 py-2">
               <div className="flex h-9 w-9 items-center justify-center rounded-full ai-gradient-bg text-sm font-semibold text-white">
-                {user?.name?.[0] ?? "U"}
+                {user?.avatarInitials ?? user?.name?.[0] ?? "U"}
               </div>
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold">{user?.name}</div>

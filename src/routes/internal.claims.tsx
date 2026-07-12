@@ -1,20 +1,66 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { X, Check, AlertTriangle, Sparkles, FileText } from "lucide-react";
-import { Badge, Button, Card, AIPanel, Modal } from "@/components/ui-kit";
-import { mockClaimsQueue } from "@/data/mock";
-import { fmtINR } from "@/data/plans";
+import { Badge, Button, Card, AIPanel, Modal, Skeleton } from "@/components/ui-kit";
+import { getInternalClaimsQueue } from "@/services/claims";
+import type { InternalClaim } from "@/data/mockData";
+import { fmtINR } from "@/lib/format";
 import { toast } from "sonner";
+import { requireAuth } from "@/components/ProtectedRoute";
 
-export const Route = createFileRoute("/internal/claims")({ component: ClaimsReviewerPage });
+export const Route = createFileRoute("/internal/claims")({
+  component: ClaimsReviewerPage,
+  beforeLoad: requireAuth(["claims_reviewer", "admin"]),
+});
 
 function ClaimsReviewerPage() {
   const [tab, setTab] = useState<"queue" | "fraud">("queue");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<null | "approve" | "escalate">(null);
-  const open = mockClaimsQueue.find((c) => c.id === openId);
+  const [confirm, setConfirm] = useState<null | "approve" | "review">(null);
+  const [localClaims, setLocalClaims] = useState<InternalClaim[] | null>(null);
 
-  const rows = tab === "fraud" ? [...mockClaimsQueue].sort((a, b) => b.fraudScore - a.fraudScore).filter((c) => c.fraudScore >= 40) : mockClaimsQueue;
+  const { data: queue = [], isLoading } = useQuery({
+    queryKey: ["internalClaims"],
+    queryFn: getInternalClaimsQueue,
+  });
+
+  const claims = localClaims ?? queue;
+  const open = claims.find((c) => c.id === openId);
+
+  const rows =
+    tab === "fraud"
+      ? [...claims].sort((a, b) => b.fraudScore - a.fraudScore).filter((c) => c.fraudScore >= 40)
+      : claims;
+
+  function updateClaim(id: string, status: InternalClaim["status"]) {
+    setLocalClaims((prev) => {
+      const base = prev ?? queue;
+      return base.map((c) => (c.id === id ? { ...c, status } : c));
+    });
+  }
+
+  function handleConfirm() {
+    if (!open || !confirm) return;
+    if (confirm === "approve") {
+      updateClaim(open.id, "Approved");
+      toast.success("Claim approved");
+    } else {
+      updateClaim(open.id, "Escalated");
+      toast.info("Claim sent to review");
+    }
+    setConfirm(null);
+    setOpenId(null);
+  }
+
+  if (isLoading) {
+    return (
+      <div>
+        <Skeleton className="mb-6 h-8 w-48" />
+        <Skeleton className="h-96 rounded-2xl" />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -25,14 +71,20 @@ function ClaimsReviewerPage() {
         </div>
         <div className="flex gap-1 rounded-xl bg-muted p-1">
           {(["queue", "fraud"] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t)} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${tab === t ? "bg-white text-primary shadow-sm" : "text-muted-foreground"}`}>
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
+                tab === t ? "bg-white text-primary shadow-sm" : "text-muted-foreground"
+              }`}
+            >
               {t === "queue" ? "All claims" : "Fraud alerts"}
             </button>
           ))}
         </div>
       </div>
 
-      <Card className="p-0 overflow-hidden">
+      <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-muted/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
@@ -54,8 +106,18 @@ function ClaimsReviewerPage() {
                   <td className="px-4 py-3">{c.type}</td>
                   <td className="px-4 py-3">{fmtINR(c.amount)}</td>
                   <td className="px-4 py-3 text-muted-foreground">{c.submitted}</td>
-                  <td className="px-4 py-3"><Badge tone={c.fraudLevel === "Low" ? "success" : c.fraudLevel === "Medium" ? "warning" : "danger"}>{c.fraudScore} · {c.fraudLevel}</Badge></td>
-                  <td className="px-4 py-3"><Badge tone={c.status === "Approved" ? "success" : "warning"}>{c.status}</Badge></td>
+                  <td className="px-4 py-3">
+                    <Badge
+                      tone={c.fraudLevel === "Low" ? "success" : c.fraudLevel === "Medium" ? "warning" : "danger"}
+                    >
+                      {c.fraudLevel}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge tone={c.status === "Approved" ? "success" : c.status === "Escalated" ? "danger" : "warning"}>
+                      {c.status}
+                    </Badge>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -65,23 +127,36 @@ function ClaimsReviewerPage() {
 
       {open && (
         <div className="fixed inset-0 z-50 flex bg-black/40" onClick={() => setOpenId(null)}>
-          <div className="ml-auto flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl page-enter" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="ml-auto flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl page-enter"
+            onClick={(e) => e.stopPropagation()}
+          >
             <header className="flex items-center justify-between border-b p-5">
               <div>
                 <div className="text-xs text-muted-foreground">{open.id}</div>
-                <h3 className="text-lg font-bold">{open.customer} · {open.type}</h3>
+                <h3 className="text-lg font-bold">
+                  {open.customer} · {open.type}
+                </h3>
               </div>
-              <button onClick={() => setOpenId(null)} className="rounded-lg p-2 hover:bg-muted"><X size={18} /></button>
+              <button onClick={() => setOpenId(null)} className="rounded-lg p-2 hover:bg-muted">
+                <X size={18} />
+              </button>
             </header>
             <div className="flex-1 space-y-5 overflow-y-auto p-5">
               <div className="grid grid-cols-2 gap-3 rounded-xl bg-muted/50 p-4 text-sm">
-                <div><div className="text-xs text-muted-foreground">Amount claimed</div><div className="font-bold">{fmtINR(open.amount)}</div></div>
-                <div><div className="text-xs text-muted-foreground">Submitted</div><div className="font-bold">{open.submitted}</div></div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Amount claimed</div>
+                  <div className="font-bold">{fmtINR(open.amount)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Submitted</div>
+                  <div className="font-bold">{open.submitted}</div>
+                </div>
               </div>
 
               <div>
                 <h4 className="mb-2 text-sm font-semibold">Documents</h4>
-                {["Hospital bill.pdf", "Discharge summary.pdf", "Diagnostic reports.pdf"].map((d) => (
+                {open.documents.map((d) => (
                   <a key={d} className="mb-2 flex items-center gap-2 rounded-xl border border-border p-3 text-sm hover:border-primary">
                     <FileText size={14} className="text-primary" /> {d}
                   </a>
@@ -89,10 +164,15 @@ function ClaimsReviewerPage() {
               </div>
 
               <AIPanel title={`AI Assessment — Fraud score ${open.fraudScore} (${open.fraudLevel})`}>
-                <div className="mt-2 space-y-2">
+                <p className="mb-3 text-sm">{open.aiAssessment}</p>
+                <div className="space-y-2">
                   {open.flags.map((f) => (
                     <div key={f} className="flex gap-2">
-                      {open.fraudLevel === "High" ? <AlertTriangle size={14} className="mt-0.5 text-danger shrink-0" /> : <Check size={14} className="mt-0.5 text-success shrink-0" />}
+                      {open.fraudLevel === "High" ? (
+                        <AlertTriangle size={14} className="mt-0.5 shrink-0 text-danger" />
+                      ) : (
+                        <Check size={14} className="mt-0.5 shrink-0 text-success" />
+                      )}
                       <span>{f}</span>
                     </div>
                   ))}
@@ -105,17 +185,33 @@ function ClaimsReviewerPage() {
                 disabled={open.fraudLevel === "High"}
                 title={open.fraudLevel === "High" ? "Senior reviewer sign-off required for high-risk claims." : undefined}
                 className="flex-1"
-              >Approve</Button>
-              <Button variant="secondary" className="flex-1" onClick={() => toast.info("Info request sent")}>Request Info</Button>
-              <Button variant="danger" onClick={() => setConfirm("escalate")}>Escalate</Button>
+              >
+                Approve
+              </Button>
+              <Button variant="secondary" className="flex-1" onClick={() => setConfirm("review")}>
+                Send to Review
+              </Button>
+              <Button variant="danger" onClick={() => toast.info("Info request sent")}>
+                Request Info
+              </Button>
             </footer>
           </div>
         </div>
       )}
 
-      <Modal open={confirm !== null} onClose={() => setConfirm(null)}
-        title={confirm === "approve" ? "Approve claim?" : "Escalate claim?"}
-        footer={<><Button variant="secondary" onClick={() => setConfirm(null)}>Cancel</Button><Button onClick={() => { toast.success(confirm === "approve" ? "Claim approved" : "Claim escalated"); setConfirm(null); setOpenId(null); }}>Confirm</Button></>}>
+      <Modal
+        open={confirm !== null}
+        onClose={() => setConfirm(null)}
+        title={confirm === "approve" ? "Approve claim?" : "Send to review?"}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirm(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirm}>Confirm</Button>
+          </>
+        }
+      >
         <p>This action is logged in the audit trail and cannot be undone from this view.</p>
       </Modal>
     </div>
