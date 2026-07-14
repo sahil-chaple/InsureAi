@@ -1,0 +1,65 @@
+import uuid
+import json
+from sqlalchemy.types import TypeDecorator, CHAR, String
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from app.core.security import encrypt_value, decrypt_value
+
+class GUID(TypeDecorator):
+    """Platform-independent GUID type.
+    Uses PostgreSQL's UUID type, otherwise CHAR(36), storing as string.
+    """
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(PG_UUID(as_uuid=True))
+        else:
+            return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        elif dialect.name == 'postgresql':
+            return value
+        else:
+            return str(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        if isinstance(value, uuid.UUID):
+            return value
+        return uuid.UUID(value)
+
+class EncryptedString(TypeDecorator):
+    """Transparently encrypts and decrypts strings using Fernet."""
+    impl = String
+    cache_ok = False
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return encrypt_value(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return decrypt_value(value)
+
+class EncryptedJSON(TypeDecorator):
+    """Transparently encrypts and decrypts JSON structures using Fernet."""
+    impl = String
+    cache_ok = False
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        json_str = json.dumps(value)
+        return encrypt_value(json_str)
+
+    def process_result_value(self, value, dialect):
+        val = decrypt_value(value)
+        if val is None:
+            return None
+        return json.loads(val)
