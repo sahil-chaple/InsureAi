@@ -20,26 +20,29 @@ def get_password_hash(password: str) -> str:
     salt = bcrypt.gensalt()
     return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
-def create_access_token(subject: Union[str, Any], expires_delta: Union[timedelta, None] = None) -> str:
+def create_access_token(subject: Union[str, Any], token_version: int = 1, expires_delta: Union[timedelta, None] = None) -> str:
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode = {"exp": expire, "sub": str(subject), "type": "access"}
+    to_encode = {"exp": expire, "sub": str(subject), "v": token_version, "type": "access"}
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=ALGORITHM)
     return encoded_jwt
 
-def create_refresh_token(subject: Union[str, Any], expires_delta: Union[timedelta, None] = None) -> str:
+def create_refresh_token(subject: Union[str, Any], token_version: int = 1, expires_delta: Union[timedelta, None] = None) -> str:
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode = {"exp": expire, "sub": str(subject), "type": "refresh"}
+    to_encode = {"exp": expire, "sub": str(subject), "v": token_version, "type": "refresh"}
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=ALGORITHM)
     return encoded_jwt
 
 def decode_token(token: str) -> dict:
     return jwt.decode(token, settings.JWT_SECRET, algorithms=[ALGORITHM])
+
+import base64
+import hashlib
 
 # Fernet symmetric encryption helpers
 _fernet = None
@@ -47,7 +50,13 @@ _fernet = None
 def get_fernet() -> Fernet:
     global _fernet
     if _fernet is None:
-        _fernet = Fernet(settings.ENCRYPTION_KEY.encode())
+        key_bytes = settings.ENCRYPTION_KEY.encode("utf-8")
+        try:
+            _fernet = Fernet(key_bytes)
+        except Exception:
+            # Derive deterministic 32-byte url-safe base64 key using SHA-256 hash digest
+            derived_key = base64.urlsafe_b64encode(hashlib.sha256(key_bytes).digest())
+            _fernet = Fernet(derived_key)
     return _fernet
 
 def encrypt_value(value: str) -> str:

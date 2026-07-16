@@ -34,6 +34,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise credentials_exception
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User account is deactivated.")
+    
+    token_version = payload.get("v")
+    if token_version is not None and token_version != getattr(user, "token_version", 1):
+        raise credentials_exception
+
     return user
 
 def require_role(*allowed_roles: str):

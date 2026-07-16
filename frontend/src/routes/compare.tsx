@@ -13,7 +13,7 @@ function ComparePage() {
   const navigate = useNavigate();
   const { comparedPlanIds, selectPlan } = usePolicyStore();
 
-  const { data: allPlans = [], isLoading } = useQuery({
+  const { data: allPlans = [], isLoading, isError, error } = useQuery({
     queryKey: ["recommendations"],
     queryFn: getRecommendations,
   });
@@ -25,6 +25,17 @@ function ComparePage() {
       <div className="min-h-dvh bg-background p-8">
         <Skeleton className="mb-6 h-8 w-48" />
         <Skeleton className="h-96 w-full rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-dvh bg-background p-8">
+        <div className="rounded-2xl border border-danger/30 bg-danger/5 p-6 text-danger">
+          <h2 className="mb-2 text-lg font-bold">Failed to load plans for comparison</h2>
+          <p className="text-sm">{(error as Error)?.message || "Server connection error."}</p>
+        </div>
       </div>
     );
   }

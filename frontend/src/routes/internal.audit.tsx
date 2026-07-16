@@ -38,7 +38,7 @@ function AuditPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  const { data: auditLog = [], isLoading: logLoading } = useQuery({
+  const { data: auditLog = [], isLoading: logLoading, isError: logError, error: errDetail } = useQuery({
     queryKey: ["auditLog"],
     queryFn: getAuditLog,
   });
@@ -70,6 +70,15 @@ function AuditPage() {
       <div>
         <Skeleton className="mb-6 h-8 w-48" />
         <Skeleton className="h-96 rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (logError) {
+    return (
+      <div className="rounded-2xl border border-danger/30 bg-danger/5 p-6 text-danger">
+        <h2 className="mb-2 text-lg font-bold">Access Denied or Failed to Load Audit Log</h2>
+        <p className="text-sm">{(errDetail as Error)?.message || "Unauthorized to view audit logs or server error occurred."}</p>
       </div>
     );
   }

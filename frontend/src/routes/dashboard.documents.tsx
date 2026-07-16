@@ -9,13 +9,13 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/dashboard/documents")({ component: DocsPage });
 
 function DocsPage() {
-  const { data: policies = [], isLoading } = useQuery({
+  const { data: policies = [], isLoading, isError, error } = useQuery({
     queryKey: ["userPolicies"],
     queryFn: getUserPolicies,
   });
 
   const docs = policies.flatMap((p) =>
-    p.documents.map((d) => ({
+    (p.documents || []).map((d) => ({
       name: d.name,
       size: d.size,
       when: fmtDate(p.validFrom),
@@ -27,6 +27,15 @@ function DocsPage() {
       <div>
         <Skeleton className="mb-6 h-8 w-48" />
         <Skeleton className="h-64 rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-2xl border border-danger/30 bg-danger/5 p-6 text-danger">
+        <h2 className="mb-2 text-lg font-bold">Failed to load documents</h2>
+        <p className="text-sm">{(error as Error)?.message || "Server connection error."}</p>
       </div>
     );
   }

@@ -1,3 +1,20 @@
+"""
+===============================================================================
+SECURITY WARNING - DEV / DEMO SEED SCRIPT ONLY
+===============================================================================
+This seed script populates default demonstration users with known passwords
+('password123') and sample policy/claim data.
+
+CRITICAL:
+1. THIS SCRIPT MUST NEVER BE RUN AGAINST A PRODUCTION DATABASE.
+2. The seeded credentials (customer@insureai.com, reviewer@insureai.com,
+   underwriter@insureai.com, admin@insureai.com, auditor@insureai.com) are
+   strictly for local development, UI testing, and demonstration.
+3. Before deploying to production, ensure these demo accounts are deleted
+   and this script is excluded from deployment pipelines.
+===============================================================================
+"""
+
 import uuid
 from datetime import datetime, date, timedelta, timezone
 from sqlalchemy.orm import Session
@@ -11,6 +28,7 @@ from app.core.security import get_password_hash
 
 def seed_db():
     print("Initializing database tables...")
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     

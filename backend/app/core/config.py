@@ -3,6 +3,8 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    ENVIRONMENT: str = "development"
+    COOKIE_SECURE: bool | None = None
     DATABASE_URL: str = "sqlite:///./insureai.db"
     REDIS_URL: str | None = None
     
@@ -16,6 +18,12 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> List[str]:
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def is_cookie_secure(self) -> bool:
+        if self.COOKIE_SECURE is not None:
+            return self.COOKIE_SECURE
+        return self.ENVIRONMENT.lower() == "production"
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -31,6 +31,12 @@ async def upload_document(
     Accepts multipart file uploads for claim or policy verification.
     Enforces validation of file types (PDF, JPG, PNG only) and size (10MB limit).
     """
+    if current_user.role == "auditor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Auditor role is read-only across the entire system."
+        )
+
     # 1. Validate file extension
     file_ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
     if file_ext not in ALLOWED_EXTENSIONS:

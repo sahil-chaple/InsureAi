@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.schemas.auth import Token, LoginSchema, RefreshTokenSchema, RefreshResponse
@@ -8,14 +9,26 @@ from app.core.security import create_access_token, create_refresh_token, decode_
 from app.core.deps import get_current_user
 from app.models.user import User
 from app.middleware.rate_limit import rate_limit
+from app.core.config import settings
 from jose import JWTError
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+def set_refresh_cookie(response: Response, refresh_token: str):
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        samesite="lax",
+        secure=settings.is_cookie_secure,
+        max_age=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path="/auth",
+    )
+
 @router.post("/signup", response_model=Token, dependencies=[Depends(rate_limit)])
-def signup(request: Request, user_in: UserCreate, db: Session = Depends(get_db)):
+def signup(request: Request, response: Response, user_in: UserCreate, db: Session = Depends(get_db)):
     """
-    Registers a new user, hashes password, and returns JWT token pair.
+    Registers a new user, hashes password, and returns JWT token pair (and sets HttpOnly refresh cookie).
     """
     db_user = auth_service.get_user_by_email(db, email=user_in.email)
     if db_user:
@@ -35,9 +48,12 @@ def signup(request: Request, user_in: UserCreate, db: Session = Depends(get_db))
     user = auth_service.create_user(db, user_in)
     
     # Generate token pair
-    access_token = create_access_token(subject=user.id)
-    refresh_token = create_refresh_token(subject=user.id)
+    version = getattr(user, "token_version", 1)
+    access_token = create_access_token(subject=user.id, token_version=version)
+    refresh_token = create_refresh_token(subject=user.id, token_version=version)
     
+    set_refresh_cookie(response, refresh_token)
+
     audit_service.create_audit_entry(
         db=db,
         action="Signup",
@@ -52,9 +68,9 @@ def signup(request: Request, user_in: UserCreate, db: Session = Depends(get_db))
     return Token(access_token=access_token, refresh_token=refresh_token)
 
 @router.post("/login", response_model=Token, dependencies=[Depends(rate_limit)])
-def login(request: Request, login_in: LoginSchema, db: Session = Depends(get_db)):
+def login(request: Request, response: Response, login_in: LoginSchema, db: Session = Depends(get_db)):
     """
-    Verifies user credentials and returns JWT token pair.
+    Verifies user credentials and returns JWT token pair (and sets HttpOnly refresh cookie).
     """
     user = auth_service.authenticate_user(db, email=login_in.email, password=login_in.password)
     if not user:
@@ -72,9 +88,12 @@ def login(request: Request, login_in: LoginSchema, db: Session = Depends(get_db)
             headers={"WWW-Authenticate": "Bearer"},
         )
         
-    access_token = create_access_token(subject=user.id)
-    refresh_token = create_refresh_token(subject=user.id)
+    version = getattr(user, "token_version", 1)
+    access_token = create_access_token(subject=user.id, token_version=version)
+    refresh_token = create_refresh_token(subject=user.id, token_version=version)
     
+    set_refresh_cookie(response, refresh_token)
+
     audit_service.create_audit_entry(
         db=db,
         action="Login",
@@ -89,14 +108,22 @@ def login(request: Request, login_in: LoginSchema, db: Session = Depends(get_db)
     return Token(access_token=access_token, refresh_token=refresh_token)
 
 @router.post("/refresh", response_model=RefreshResponse)
-def refresh(refresh_in: RefreshTokenSchema, db: Session = Depends(get_db)):
+def refresh(request: Request, response: Response, refresh_in: Optional[RefreshTokenSchema] = None, db: Session = Depends(get_db)):
     """
-    Validates a refresh token and issues a new access token.
+    Validates a refresh token (from request body or HttpOnly cookie) and issues a new access token.
     """
+    token_str = (refresh_in.refresh_token if refresh_in and refresh_in.refresh_token else None) or request.cookies.get("refresh_token")
+    if not token_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token missing"
+        )
+
     try:
-        payload = decode_token(refresh_in.refresh_token)
+        payload = decode_token(token_str)
         user_id: str = payload.get("sub")
         token_type: str = payload.get("type")
+        token_version: Optional[int] = payload.get("v")
         if user_id is None or token_type != "refresh":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -113,9 +140,46 @@ def refresh(refresh_in: RefreshTokenSchema, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found.")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user.")
+
+    # Server-side invalidation check: compare token version with user's current version in DB
+    current_version = getattr(user, "token_version", 1)
+    if token_version is not None and token_version != current_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has been revoked or session invalidated."
+        )
         
-    access_token = create_access_token(subject=user.id)
+    access_token = create_access_token(subject=user.id, token_version=current_version)
+    new_refresh_token = create_refresh_token(subject=user.id, token_version=current_version)
+    set_refresh_cookie(response, new_refresh_token)
     return RefreshResponse(access_token=access_token)
+
+@router.post("/logout")
+def logout(request: Request, response: Response, refresh_in: Optional[RefreshTokenSchema] = None, db: Session = Depends(get_db)):
+    """
+    Clears HttpOnly cookie and invalidates server-side user tokens by incrementing token_version.
+    """
+    # Attempt to extract token from body, cookie, or auth header to find the user to invalidate
+    token_str = (refresh_in.refresh_token if refresh_in and refresh_in.refresh_token else None) or request.cookies.get("refresh_token")
+    if not token_str:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token_str = auth_header.split(" ")[1]
+
+    if token_str:
+        try:
+            payload = decode_token(token_str)
+            user_id = payload.get("sub")
+            if user_id:
+                user = auth_service.get_user_by_id(db, user_id=user_id)
+                if user:
+                    user.token_version = (getattr(user, "token_version", 1) or 1) + 1
+                    db.commit()
+        except Exception:
+            pass
+
+    response.delete_cookie(key="refresh_token", path="/auth", httponly=True, samesite="lax", secure=settings.is_cookie_secure)
+    return {"detail": "Successfully logged out and session revoked"}
 
 @router.get("/me", response_model=UserOut)
 def read_user_me(current_user: User = Depends(get_current_user)):

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Numeric
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Numeric, Integer
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
 from app.models.base import GUID, EncryptedString, EncryptedJSON
@@ -14,6 +14,7 @@ class User(Base):
     full_name = Column(String, nullable=False)
     role = Column(String, default="customer", nullable=False) # customer, claims_reviewer, underwriter, admin, auditor
     phone = Column(String, nullable=True)
+    token_version = Column(Integer, default=1, nullable=False, server_default="1")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
 

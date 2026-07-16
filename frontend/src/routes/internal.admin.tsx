@@ -40,7 +40,7 @@ function AdminPage() {
   const role = useAuthStore((s) => s.user?.role);
   const flaggedMessages = useAssistantQueueStore((s) => s.flaggedMessages);
 
-  const { data: activity = [], isLoading } = useQuery({
+  const { data: activity = [], isLoading, isError, error } = useQuery({
     queryKey: ["agentActivity"],
     queryFn: getAgentActivity,
   });
@@ -64,6 +64,15 @@ function AdminPage() {
             <Skeleton key={i} className="h-28 rounded-2xl" />
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-2xl border border-danger/30 bg-danger/5 p-6 text-danger">
+        <h2 className="mb-2 text-lg font-bold">Access Denied or Server Error</h2>
+        <p className="text-sm">{(error as Error)?.message || "Failed to load admin telemetry dashboard."}</p>
       </div>
     );
   }

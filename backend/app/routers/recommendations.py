@@ -55,6 +55,12 @@ def analyze_risk(
     """
     Saves/updates the user's onboarding profile and computes a rule-based mock risk analysis.
     """
+    if current_user.role == "auditor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Auditor role is read-only across the entire system."
+        )
+
     profile = auth_service.create_or_update_profile(db, user_id=current_user.id, profile_in=profile_in)
     
     age = calculate_age(profile.date_of_birth)
