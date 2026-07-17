@@ -17,7 +17,7 @@ function statusLabel(status: Parameters<typeof policyStatusLabel>[0]) {
 function PoliciesPage() {
   const [openId, setOpenId] = useState<string | null>(null);
 
-  const { data: policies = [], isLoading } = useQuery({
+  const { data: policies = [], isLoading, isError, error } = useQuery({
     queryKey: ["userPolicies"],
     queryFn: getUserPolicies,
   });
@@ -42,6 +42,15 @@ function PoliciesPage() {
             <Skeleton key={i} className="h-52 rounded-2xl" />
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-2xl border border-danger/30 bg-danger/5 p-6 text-danger">
+        <h2 className="mb-2 text-lg font-bold">Failed to load policies</h2>
+        <p className="text-sm">{(error as Error)?.message || "An error occurred while fetching policy records."}</p>
       </div>
     );
   }

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { setAccessToken } from "@/services/apiClient";
 
 export type Role = "customer" | "claims_reviewer" | "underwriter" | "admin" | "auditor";
 
@@ -28,16 +29,30 @@ export const useAuthStore = create<AuthState>()(
       role: null,
       isAuthenticated: false,
       token: null,
-      login: (user, token) =>
+      login: (user, token) => {
+        const authToken = token ?? `mock-jwt-${user.id}`;
+        setAccessToken(authToken);
         set({
           user,
           role: user.role,
           isAuthenticated: true,
-          token: token ?? `mock-jwt-${user.id}`,
-        }),
-      logout: () => set({ user: null, role: null, isAuthenticated: false, token: null }),
+          token: authToken,
+        });
+      },
+      logout: () => {
+        setAccessToken(null);
+        set({ user: null, role: null, isAuthenticated: false, token: null });
+      },
     }),
-    { name: "insureai-auth" },
+    {
+      name: "insureai-auth",
+      partialize: (state) => ({
+        user: state.user,
+        role: state.role,
+        isAuthenticated: state.isAuthenticated,
+        // CRITICAL SECURITY RULE: Do NOT persist token in localStorage
+      }),
+    },
   ),
 );
 

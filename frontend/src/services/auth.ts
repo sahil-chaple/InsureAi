@@ -1,67 +1,112 @@
-import { mockUser } from "@/data/mockData";
 import { useAuthStore, type AuthUser, type Role } from "@/store/auth";
+import { apiClient, setAccessToken } from "./apiClient";
+import {
+  mockSignup,
+  mockLogin,
+  mockDemoLogin,
+  mockGetCurrentUser,
+  mockLogout,
+} from "./mockData";
 
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA === "true";
 
 export type LoginResult = {
   user: AuthUser;
   token: string;
 };
 
-const DEMO_NAMES: Record<Role, string> = {
-  customer: mockUser.name,
-  claims_reviewer: "Priya Reviewer",
-  underwriter: "Rahul Underwriter",
-  admin: "Neha Admin",
-  auditor: "Vikram Auditor",
+const DEMO_EMAILS: Record<Role, string> = {
+  customer: "customer@insureai.com",
+  claims_reviewer: "reviewer@insureai.com",
+  underwriter: "underwriter@insureai.com",
+  admin: "admin@insureai.com",
+  auditor: "auditor@insureai.com",
 };
 
-function toAuthUser(role: Role, name?: string, email?: string): AuthUser {
-  if (role === "customer") {
-    return {
-      id: mockUser.id,
-      name: mockUser.name,
-      email: mockUser.email,
-      phone: mockUser.phone,
-      avatarInitials: mockUser.avatarInitials,
-      role: "customer",
-    };
-  }
+interface TokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  token_type?: string;
+}
+
+interface UserOut {
+  id: string;
+  full_name: string;
+  email: string;
+  phone?: string;
+  role: string;
+  is_active: boolean;
+}
+
+function mapUserOutToAuthUser(u: UserOut): AuthUser {
+  const initials = u.full_name
+    ? u.full_name
+        .split(" ")
+        .map((w) => w[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "US";
+
   return {
-    id: crypto.randomUUID(),
-    name: name ?? DEMO_NAMES[role],
-    email: email ?? `${role}@insureai.demo`,
-    avatarInitials: (name ?? DEMO_NAMES[role]).split(" ").map((w) => w[0]).join("").slice(0, 2),
-    role,
+    id: u.id,
+    name: u.full_name,
+    email: u.email,
+    phone: u.phone || undefined,
+    avatarInitials: initials,
+    role: u.role as Role,
   };
 }
 
-export async function signup(name: string, email: string): Promise<LoginResult> {
-  await sleep(1500);
-  const user: AuthUser = { ...toAuthUser("customer"), name, email };
-  const token = `mock-jwt-${crypto.randomUUID()}`;
-  return { user, token };
+export async function signup(name: string, email: string, password = "password123"): Promise<LoginResult> {
+  if (USE_MOCK) return mockSignup(name, email);
+
+  const res = await apiClient<TokenResponse>("auth/signup", {
+    method: "POST",
+    body: JSON.stringify({
+      full_name: name,
+      email,
+      password,
+    }),
+  });
+
+  setAccessToken(res.access_token);
+  const user = await getCurrentUser();
+  return { user, token: res.access_token };
 }
 
-export async function login(_email: string, _password: string): Promise<LoginResult> {
-  await sleep(900);
-  const user = toAuthUser("customer");
-  const token = `mock-jwt-${crypto.randomUUID()}`;
-  return { user, token };
+export async function login(email: string, password: string): Promise<LoginResult> {
+  if (USE_MOCK) return mockLogin(email, password);
+
+  const res = await apiClient<TokenResponse>("auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+
+  setAccessToken(res.access_token);
+  const user = await getCurrentUser();
+  return { user, token: res.access_token };
 }
 
 export async function demoLogin(role: Role): Promise<LoginResult> {
-  await sleep(400);
-  const user = toAuthUser(role);
-  const token = `mock-jwt-${crypto.randomUUID()}`;
-  return { user, token };
+  if (USE_MOCK) return mockDemoLogin(role);
+
+  const email = DEMO_EMAILS[role] || "customer@insureai.com";
+  return login(email, "password123");
 }
 
 export async function getCurrentUser(): Promise<AuthUser> {
-  await sleep(300);
-  return toAuthUser("customer");
+  if (USE_MOCK) return mockGetCurrentUser();
+
+  const userOut = await apiClient<UserOut>("auth/me");
+  return mapUserOutToAuthUser(userOut);
 }
 
 export function logout(): void {
+  if (USE_MOCK) {
+    mockLogout();
+    return;
+  }
+  apiClient("auth/logout", { method: "POST" }).catch(() => {});
   useAuthStore.getState().logout();
 }

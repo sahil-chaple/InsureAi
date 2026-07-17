@@ -24,7 +24,7 @@ function RecommendationsPage() {
   const { comparedPlanIds, toggleCompare, clearCompare, selectPlan } = usePolicyStore();
   const riskProfile = useOnboarding((s) => s.riskProfile);
 
-  const { data: plans = [], isLoading } = useQuery({
+  const { data: plans = [], isLoading, isError, error } = useQuery({
     queryKey: ["recommendations"],
     queryFn: getRecommendations,
   });
@@ -110,6 +110,11 @@ function RecommendationsPage() {
             {[1, 2, 3, 4].map((i) => (
               <Skeleton key={i} className="h-80 rounded-2xl" />
             ))}
+          </div>
+        ) : isError ? (
+          <div className="mt-6 rounded-2xl border border-danger/30 bg-danger/5 p-6 text-danger">
+            <h2 className="mb-2 text-lg font-bold">Unable to load plan recommendations</h2>
+            <p className="text-sm">{(error as Error)?.message || "Server connection error."}</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="mt-12 text-center text-muted-foreground">No plans match this filter.</div>

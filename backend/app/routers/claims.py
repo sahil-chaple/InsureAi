@@ -54,6 +54,12 @@ def create_new_claim(
     """
     Files a new claim against an active policy.
     """
+    if current_user.role == "auditor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Auditor role is read-only across the entire system."
+        )
+
     db_claim = claims_service.create_claim(db, user_id=current_user.id, claim_in=claim_in)
     
     audit_service.create_audit_entry(

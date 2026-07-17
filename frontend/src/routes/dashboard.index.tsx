@@ -13,24 +13,25 @@ export const Route = createFileRoute("/dashboard/")({ component: DashboardHome }
 function DashboardHome() {
   const user = useAuthStore((s) => s.user);
 
-  const { data: policies = [], isLoading: policiesLoading } = useQuery({
+  const { data: policies = [], isLoading: policiesLoading, isError: policiesError, error: pErr } = useQuery({
     queryKey: ["userPolicies"],
     queryFn: getUserPolicies,
   });
 
-  const { data: claims = [], isLoading: claimsLoading } = useQuery({
+  const { data: claims = [], isLoading: claimsLoading, isError: claimsError, error: cErr } = useQuery({
     queryKey: ["userClaims"],
     queryFn: getUserClaims,
   });
 
-  const { data: auditLog = [], isLoading: auditLoading } = useQuery({
+  const { data: auditLog = [], isLoading: auditLoading, isError: auditError } = useQuery({
     queryKey: ["auditLog"],
     queryFn: getAuditLog,
   });
 
   const loading = policiesLoading || claimsLoading || auditLoading;
+  const hasError = policiesError || claimsError || auditError;
 
-  const totalCoverage = policies.reduce((s, p) => s + p.coverage, 0);
+  const totalCoverage = policies.reduce((s, p) => s + (p.coverage || 0), 0);
   const openClaims = claims.filter((c) => c.status === "under_review" || c.status === "submitted").length;
   const active = policies.filter((p) => p.status === "active");
   const hero = active[0];
@@ -44,6 +45,19 @@ function DashboardHome() {
   const today = fmtDate(new Date());
 
   if (loading) return <DashboardSkeleton />;
+
+  if (hasError) {
+    const errorMsg = (pErr as Error)?.message || (cErr as Error)?.message || "Failed to load dashboard data from backend server.";
+    return (
+      <div className="rounded-2xl border border-danger/30 bg-danger/5 p-6 text-danger">
+        <h2 className="mb-2 text-lg font-bold">Unable to sync dashboard</h2>
+        <p className="text-sm">{errorMsg}</p>
+        <button onClick={() => window.location.reload()} className="mt-4 rounded-xl bg-danger px-4 py-2 text-sm font-semibold text-white hover:bg-danger/90">
+          Retry Connection
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

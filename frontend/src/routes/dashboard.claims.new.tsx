@@ -16,7 +16,7 @@ function NewClaimPage() {
   const navigate = useNavigate();
   const submitClaim = useClaimsStore((s) => s.submitClaim);
 
-  const { data: policies = [], isLoading } = useQuery({
+  const { data: policies = [], isLoading, isError, error } = useQuery({
     queryKey: ["userPolicies"],
     queryFn: getUserPolicies,
   });
@@ -38,6 +38,17 @@ function NewClaimPage() {
         <Skeleton className="h-6 w-24" />
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-96 rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <div className="rounded-2xl border border-danger/30 bg-danger/5 p-6 text-danger">
+          <h2 className="mb-2 text-lg font-bold">Failed to load active policies</h2>
+          <p className="text-sm">{(error as Error)?.message || "Server connection error."}</p>
+        </div>
       </div>
     );
   }

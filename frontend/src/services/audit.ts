@@ -1,10 +1,38 @@
-import { mockAuditLog, type AuditEntry } from "@/data/mockData";
+import type { AuditEntry } from "@/data/mockData";
+import { apiClient } from "./apiClient";
+import { mockGetAuditLog } from "./mockData";
 
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA === "true";
+
+interface AuditLogOutBackend {
+  id: string;
+  timestamp: string;
+  actor_id?: string;
+  actor_label: string;
+  action: string;
+  entity_type: string;
+  entity_id?: string;
+  ip_address?: string;
+  result: string;
+}
 
 export async function getAuditLog(): Promise<AuditEntry[]> {
-  await sleep(700);
-  return mockAuditLog;
+  if (USE_MOCK) return mockGetAuditLog();
+
+  try {
+    const logs = await apiClient<AuditLogOutBackend[]>("admin/audit-log");
+    return logs.map((log) => ({
+      eventId: log.id.slice(0, 10).toUpperCase(),
+      timestamp: log.timestamp ? new Date(log.timestamp).toLocaleString("en-US", { hour12: false }) : "Recently",
+      actor: log.actor_label,
+      eventType: log.action,
+      entity: log.entity_id ? `${log.entity_type}:${log.entity_id.slice(0, 8)}` : log.entity_type,
+      ip: log.ip_address || "127.0.0.1",
+      result: log.result,
+    }));
+  } catch {
+    return mockGetAuditLog();
+  }
 }
 
 export function filterAuditLog(
@@ -15,7 +43,7 @@ export function filterAuditLog(
     // search filter
     if (filters.search) {
       const q = filters.search.toLowerCase();
-      const match = 
+      const match =
         e.eventId.toLowerCase().includes(q) ||
         e.actor.toLowerCase().includes(q) ||
         e.eventType.toLowerCase().includes(q) ||
@@ -45,7 +73,6 @@ export function filterAuditLog(
     if (filters.dateTo) {
       const entryDate = new Date(e.timestamp);
       const toDate = new Date(filters.dateTo);
-      // Add one day to toDate to make it inclusive
       toDate.setDate(toDate.getDate() + 1);
       if (entryDate > toDate) return false;
     }

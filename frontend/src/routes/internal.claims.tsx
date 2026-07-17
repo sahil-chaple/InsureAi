@@ -20,7 +20,7 @@ function ClaimsReviewerPage() {
   const [confirm, setConfirm] = useState<null | "approve" | "review">(null);
   const [localClaims, setLocalClaims] = useState<InternalClaim[] | null>(null);
 
-  const { data: queue = [], isLoading } = useQuery({
+  const { data: queue = [], isLoading, isError, error } = useQuery({
     queryKey: ["internalClaims"],
     queryFn: getInternalClaimsQueue,
   });
@@ -58,6 +58,15 @@ function ClaimsReviewerPage() {
       <div>
         <Skeleton className="mb-6 h-8 w-48" />
         <Skeleton className="h-96 rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-2xl border border-danger/30 bg-danger/5 p-6 text-danger">
+        <h2 className="mb-2 text-lg font-bold">Access Denied or Failed to Load Queue</h2>
+        <p className="text-sm">{(error as Error)?.message || "Unauthorized to view claims queue or server error occurred."}</p>
       </div>
     );
   }

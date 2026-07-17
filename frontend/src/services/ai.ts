@@ -1,6 +1,13 @@
-import { mockAgentActivity, mockChatHistory } from "@/data/mockData";
+import type { AgentActivityEntry } from "@/data/mockData";
+import { apiClient } from "./apiClient";
+import {
+  mockGetChatResponse,
+  mockGetClaimResponse,
+  mockAnalyzeUserProfile,
+  mockGetAgentActivity,
+} from "./mockData";
 
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA === "true";
 
 export type RiskProfile = {
   healthRisk: string;
@@ -22,44 +29,39 @@ export type ChatResponse = {
   flagged: boolean;
 };
 
+interface RiskAnalysisBackend {
+  healthRisk: string;
+  assetExposure: string;
+  lifeCoverNeed: string;
+  profile: any;
+}
+
+interface AgentActivityOutBackend {
+  id: string;
+  timestamp: string;
+  agent_name: string;
+  action: string;
+  target_entity: string;
+  target_id: string;
+  confidence: number;
+  reasoning: string;
+  status: string;
+}
+
+function capitalize(s: string) {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
 export async function getChatResponse(message: string): Promise<ChatResponse> {
-  await sleep(900);
-  const lowerMsg = message.toLowerCase();
-
-  const keywordMap: [string[], number][] = [
-    [["hospitalization", "health policy", "cover"], 0],
-    [["accident", "claim", "file a claim", "motor"], 1],
-    [["premium", "due", "next", "renew"], 2],
-  ];
-
-  for (const [keywords, idx] of keywordMap) {
-    if (keywords.some((kw) => lowerMsg.includes(kw))) {
-      const qa = mockChatHistory[idx];
-      return {
-        text: qa.a,
-        citations: qa.citations.map((c) => ({
-          label: c.includes("INS-") ? "Policy No" : "Reference",
-          doc: c,
-        })),
-        confidence: idx === 0 ? 96 : idx === 1 ? 92 : 95,
-        flagged: false,
-      };
-    }
-  }
-
-  return {
-    text: "I'm not sure I can answer that right now. Your query has been flagged for human review — a support agent will follow up shortly.",
-    citations: [],
-    confidence: 68,
-    flagged: true,
-  };
+  return mockGetChatResponse(message);
 }
 
 export function getSeededChatHistory() {
   return [
     {
       role: "ai" as const,
-      text: "Hi Arjun! I have access to your active policies and can answer questions about coverage, claims, or renewals. What would you like to know?",
+      text: "Hi! I have access to your active policies and can answer questions about coverage, claims, or renewals. What would you like to know?",
       citations: [],
       confidence: 100,
     },
@@ -69,38 +71,70 @@ export function getSeededChatHistory() {
     },
     {
       role: "ai" as const,
-      text: "Your Star Comprehensive Health policy (INS-2024-HL-00487) covers room rent up to 1% of the sum insured (₹5,000/day) and ICU charges up to 2%. It also covers pre-hospitalization for 60 days and post-hospitalization for 90 days. Day care treatments and annual health checkups are fully covered.",
+      text: "Your Health policy covers room rent, ICU charges, daycare procedures, pre-hospitalization for 60 days, and post-hospitalization for 90 days with zero copay.",
       citations: [{ label: "Policy Document", doc: "Policy_HL-2024.pdf" }],
       confidence: 96,
     },
   ];
 }
 
-export async function getClaimResponse(desc: string): Promise<{ approvalLikelihood: number; notes: string[]; summary: string }> {
-  await sleep(1500);
-  return {
-    approvalLikelihood: 87,
-    summary: "Based on initial AI triage of the details provided, the claim shows standard eligibility alignment.",
-    notes: [
-      "Incident description matches covered events under your active policy.",
-      "Required document format verified and verified by AI model.",
-      "No anomalous claim frequency detected on this policy.",
-    ],
-  };
+export async function getClaimResponse(desc: string) {
+  return mockGetClaimResponse(desc);
 }
 
-export async function analyzeUserProfile(_profileData: any): Promise<RiskProfile> {
-  await sleep(6000);
-  return {
-    healthRisk: "Moderate",
-    assetExposure: "High",
-    lifeCoverNeed: "Critical",
-    recommendedBudgetMin: 15000,
-    recommendedBudgetMax: 35000,
+export async function analyzeUserProfile(profileData: any): Promise<RiskProfile> {
+  if (USE_MOCK) return mockAnalyzeUserProfile(profileData);
+
+  const payload = {
+    date_of_birth: profileData.dob || "1992-06-15",
+    gender: profileData.gender || "male",
+    marital_status: profileData.marital || "single",
+    occupation: profileData.occupation || "Professional",
+    annual_income: Number(profileData.income) || 75000,
+    city: profileData.city || "Metropolis",
+    state: profileData.state || "State",
+    height_cm: Number(profileData.heightCm) || 175,
+    weight_kg: Number(profileData.weightKg) || 70,
+    is_smoker: Boolean(profileData.smoker),
+    pre_existing_conditions: profileData.conditions || [],
+    owns_vehicle: Boolean(profileData.ownsVehicle),
+    owns_home: Boolean(profileData.ownsHome),
   };
+
+  try {
+    const res = await apiClient<RiskAnalysisBackend>("recommendations/analyze", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    return {
+      healthRisk: capitalize(res.healthRisk),
+      assetExposure: capitalize(res.assetExposure),
+      lifeCoverNeed: capitalize(res.lifeCoverNeed),
+      recommendedBudgetMin: 15000,
+      recommendedBudgetMax: 35000,
+    };
+  } catch {
+    return mockAnalyzeUserProfile(profileData);
+  }
 }
 
-export async function getAgentActivity() {
-  await sleep(600);
-  return mockAgentActivity;
+export async function getAgentActivity(): Promise<AgentActivityEntry[]> {
+  if (USE_MOCK) return mockGetAgentActivity();
+
+  try {
+    const activities = await apiClient<AgentActivityOutBackend[]>("admin/agent-activity");
+    return activities.map((a) => ({
+      id: a.id,
+      agentName: a.agent_name,
+      action: a.action,
+      confidence: Math.round(a.confidence * 100),
+      humanOverride: false,
+      timestamp: a.timestamp ? new Date(a.timestamp).toLocaleTimeString() : "Recent",
+      inputSummary: `${a.action} on ${a.target_entity} (${a.target_id})`,
+      outputSummary: a.reasoning,
+    }));
+  } catch {
+    return mockGetAgentActivity();
+  }
 }

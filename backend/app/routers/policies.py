@@ -45,6 +45,12 @@ def create_new_policy(
     """
     Creates a new policy post-checkout.
     """
+    if current_user.role == "auditor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Auditor role is read-only across the entire system."
+        )
+
     db_policy = policy_service.create_policy(db, user_id=current_user.id, policy_in=policy_in)
     
     audit_service.create_audit_entry(
@@ -70,6 +76,12 @@ def renew_existing_policy(
     """
     Renews an active or expired policy contract, extending the end date.
     """
+    if current_user.role == "auditor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Auditor role is read-only across the entire system."
+        )
+
     policy = policy_service.get_policy_by_id(db, policy_id=str(id))
     if not policy:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Policy not found.")
